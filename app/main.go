@@ -4,6 +4,7 @@ import (
 	"go_todo/database"
 	"go_todo/model"
 	"go_todo/route"
+	"go_todo/util"
 	"net/http"
 
 	"github.com/golang-jwt/jwt"
@@ -16,24 +17,20 @@ type jwtCustomClaims struct {
 	jwt.StandardClaims
 }
 
-var signingKey = []byte("secret")
-
-func accessible(c echo.Context) error {
-	return c.String(http.StatusOK, "Accessible")
-}
-
 func user(c echo.Context) error {
 	cookie, err := c.Cookie("token")
 	if err != nil {
-		return echo.ErrCookieNotFound
+		util.JSONError(c, http.StatusUnauthorized, 100)
+		return err
 	}
 
 	token, err := jwt.ParseWithClaims(cookie.Value, &jwtCustomClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return signingKey, nil
+		return []byte("secret"), nil
 	})
 
 	if err != nil || !token.Valid {
-		return echo.ErrUnauthorized
+		util.JSONError(c, http.StatusUnauthorized, 100)
+		return err
 	}
 
 	claims := token.Claims.(*jwtCustomClaims)
@@ -53,6 +50,9 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
 	}))
 
+	// error
+	e.HTTPErrorHandler = util.CustomErrorHandler
+
 	// db
 	database.Init()
 	db := database.GetDB()
@@ -60,8 +60,6 @@ func main() {
 
 	// routing
 	route.NewRouter(e, db)
-
-	e.GET("/", accessible)
 
 	r := e.Group("/user")
 	r.GET("", user)

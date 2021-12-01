@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"database/sql"
-	"fmt"
 	"go_todo/model"
 	"go_todo/repository"
+	"go_todo/util"
 	"net/http"
 	"time"
 
@@ -29,6 +29,8 @@ type jwtCustomClaims struct {
 	jwt.StandardClaims
 }
 
+var JSONError = util.JSONError
+
 func NewAuthHandler(db *sql.DB) AuthHandler {
 	return &authHandler{
 		db:       *db,
@@ -39,40 +41,47 @@ func NewAuthHandler(db *sql.DB) AuthHandler {
 func (h *authHandler) Signup(c echo.Context) error {
 	u := new(model.User)
 	if err := c.Bind(u); err != nil {
-		return c.JSON(http.StatusBadRequest, err)
+		JSONError(c, http.StatusBadRequest, 400)
+		return err
 	}
-	fmt.Println(u)
+
+	// 登録済みのユーザーであるか検証してから登録処理を行う
 	_, err := h.authRepo.FindByEmail(h.db, *u)
 	switch {
 	case err == sql.ErrNoRows:
 		user, err := h.authRepo.Create(h.db, *u)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, err)
+			JSONError(c, http.StatusInternalServerError, 500)
+			return err
 		}
-
 		return c.JSON(http.StatusOK, user)
 	case err != nil:
-		return c.JSON(http.StatusInternalServerError, err)
+		JSONError(c, http.StatusInternalServerError, 500)
+		return err
 	default:
-		return c.JSON(http.StatusConflict, "既に使用されたメールアドレスです。")
+		JSONError(c, http.StatusConflict, 409)
+		return err
 	}
 }
 
 func (h *authHandler) Login(c echo.Context) error {
 	u := new(model.User)
 	if err := c.Bind(u); err != nil {
-		return c.JSON(http.StatusBadRequest, err)
+		JSONError(c, http.StatusBadRequest, 400)
+		return err
 	}
 
 	password := u.Password
 	user, err := h.authRepo.FindByEmail(h.db, *u)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, "登録されたユーザーが見つかりません。")
+		JSONError(c, http.StatusUnauthorized, 401)
+		return err
 	}
 
 	bcrypt_err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if bcrypt_err != nil {
-		return c.JSON(http.StatusNotFound, "登録されたユーザーが見つかりません。")
+		JSONError(c, http.StatusUnauthorized, 401)
+		return err
 	}
 
 	claims := &jwtCustomClaims{
@@ -86,7 +95,8 @@ func (h *authHandler) Login(c echo.Context) error {
 
 	t, err := token.SignedString([]byte("secret"))
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, err)
+		JSONError(c, http.StatusUnauthorized, 401)
+		return err
 	}
 
 	cookie := &http.Cookie{
@@ -102,7 +112,8 @@ func (h *authHandler) Login(c echo.Context) error {
 func (h *authHandler) Logout(c echo.Context) error {
 	cookie, err := c.Cookie("token")
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, err)
+		JSONError(c, http.StatusUnauthorized, 401)
+		return err
 	}
 
 	cookie.Name = "token"
