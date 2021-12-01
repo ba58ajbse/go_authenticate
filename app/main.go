@@ -18,22 +18,10 @@ type jwtCustomClaims struct {
 }
 
 func user(c echo.Context) error {
-	cookie, err := c.Cookie("token")
+	claims, err := util.ReadCookie(c, "token")
 	if err != nil {
-		util.JSONError(c, http.StatusUnauthorized, 100)
 		return err
 	}
-
-	token, err := jwt.ParseWithClaims(cookie.Value, &jwtCustomClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return []byte("secret"), nil
-	})
-
-	if err != nil || !token.Valid {
-		util.JSONError(c, http.StatusUnauthorized, 100)
-		return err
-	}
-
-	claims := token.Claims.(*jwtCustomClaims)
 	name := claims.Name
 
 	return c.String(http.StatusOK, "Welcome "+name+"!")
@@ -61,8 +49,7 @@ func main() {
 	// routing
 	route.NewRouter(e, db)
 
-	r := e.Group("/user")
-	r.GET("", user)
+	e.GET("/user", user)
 
 	// start
 	e.Logger.Fatal(e.Start(":8080"))

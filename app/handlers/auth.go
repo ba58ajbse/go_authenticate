@@ -99,12 +99,7 @@ func (h *authHandler) Login(c echo.Context) error {
 		return err
 	}
 
-	cookie := &http.Cookie{
-		Name:    "token",
-		Value:   t,
-		Expires: time.Now().Add(24 * time.Hour),
-	}
-	c.SetCookie(cookie)
+	util.WriteCookie(c, "token", t)
 
 	return c.JSON(http.StatusOK, "ログイン成功")
 }
@@ -116,10 +111,7 @@ func (h *authHandler) Logout(c echo.Context) error {
 		return err
 	}
 
-	cookie.Name = "token"
-	cookie.Value = ""
-	cookie.Expires = time.Now().Add(-time.Hour)
-	c.SetCookie(cookie)
+	util.ClearCookie(c, "token", cookie)
 
 	return c.JSON(http.StatusOK, "ログアウト成功")
 }
