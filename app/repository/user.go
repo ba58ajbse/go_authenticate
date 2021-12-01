@@ -8,8 +8,8 @@ import (
 )
 
 type UserRepository interface {
-	Signup(db sql.DB, u model.User) (model.User, error)
-	Login(db sql.DB, u model.User) (model.User, error)
+	FindByEmail(db sql.DB, u model.User) (model.User, error)
+	Create(db sql.DB, u model.User) (model.User, error)
 }
 
 type userRepository struct{}
@@ -18,7 +18,17 @@ func NewUserRepository() UserRepository {
 	return &userRepository{}
 }
 
-func (r *userRepository) Signup(db sql.DB, u model.User) (model.User, error) {
+func (r *userRepository) FindByEmail(db sql.DB, u model.User) (model.User, error) {
+	err := db.QueryRow("SELECT * FROM users WHERE email = ?", u.Email).
+		Scan(&u.Id, &u.Name, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return u, err
+	}
+
+	return u, err
+}
+
+func (r *userRepository) Create(db sql.DB, u model.User) (model.User, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return u, err
@@ -44,22 +54,7 @@ func (r *userRepository) Signup(db sql.DB, u model.User) (model.User, error) {
 	}
 
 	u.Id = int(lastId)
+	u.Password = string(hashedPass)
 
 	return u, nil
-}
-
-func (r *userRepository) Login(db sql.DB, u model.User) (model.User, error) {
-	password := u.Password
-	err := db.QueryRow("SELECT * FROM users WHERE email = ?", u.Email).
-		Scan(&u.Id, &u.Name, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt)
-	if err != nil {
-		return u, err
-	}
-
-	bcrypt_err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
-	if bcrypt_err != nil {
-		return u, bcrypt_err
-	}
-
-	return u, err
 }

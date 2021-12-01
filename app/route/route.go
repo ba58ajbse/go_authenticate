@@ -13,9 +13,9 @@ func NewRouter(e *echo.Echo, db *sql.DB) {
 		return c.JSON(http.StatusOK, "Hello, World!")
 	})
 
-	h := handlers.NewUserHandler(db)
+	auth := handlers.NewAuthHandler(db)
 
-	e.POST("/signup", h.Signup)
-	e.POST("/login", h.Login)
-	e.GET("/logout", handlers.Logout)
+	e.POST("/signup", auth.Signup)
+	e.POST("/login", auth.Login)
+	e.GET("/logout", auth.Logout)
 }
